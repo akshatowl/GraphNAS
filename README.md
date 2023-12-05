@@ -54,7 +54,7 @@ After the model is constructed it will be saved in a folder directory within the
 
 Identify the model that is generated based on the time of generation and then copy the path of the model file.
 
-In the semi directory in GraphNAS/semi/eval_designed_gnn.py enter the correct path of the model in the `customer_architecture_path` string.  
+In the `semi` directory in `GraphNAS/semi/eval_designed_gnn.py` enter the correct path of the model in the `customer_architecture_path` string.  
 ```
 custom_architecture_path = "/path_to_model/model.pth"
 
