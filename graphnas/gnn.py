@@ -50,7 +50,10 @@ class GraphNet(torch.nn.Module):
             out_channels = actions[i * state_num + 4]
             hidden_units_list.append(head_num * out_channels)
             out_channels_list.append(out_channels)
-
+        print(f"head_num: {head_num}, out_channels: {out_channels}")
+        print(f"hidden_units_list: {hidden_units_list}")
+        print(f"out_channels_list: {out_channels_list}")
+        print(f"Debug: self.num_label = {self.num_label}")
         return out_channels_list[-1] == self.num_label
 
     def build_hidden_layers(self, actions, batch_normal, drop_out, layer_nums, num_feat, num_label, state_num=6):

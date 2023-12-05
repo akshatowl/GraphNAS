@@ -1,16 +1,22 @@
 import glob
 import os
-
+import torch.optim as optim
 import numpy as np
 import scipy.signal
 import torch
-
+import torch.nn.functional as F
 import graphnas.utils.tensor_utils as utils
 from graphnas.gnn_model_manager import CitationGNNManager
 from graphnas_variants.macro_graphnas.pyg.pyg_gnn_model_manager import GeoCitationManager
 
 logger = utils.get_logger()
 
+def discount_butterworth(x, amount, cutoff_freq=0.1, order=4, axis=0):
+    b, a = scipy.signal.butter(order, cutoff_freq, btype='low', analog=False, output='ba')
+    filtered_data = scipy.signal.lfilter(b, a, x, axis=axis)
+    discounted_data = scipy.signal.lfilter([1], [1, -amount], filtered_data[::-1], axis=axis)[::-1]
+
+    return discounted_data
 
 def discount(x, amount):
     return scipy.signal.lfilter([1], [1, -amount], x[::-1], axis=0)[::-1]
@@ -37,7 +43,6 @@ def _get_optimizer(name):
 
     return optim
 
-
 class Trainer(object):
     """Manage the training process"""
 
@@ -57,12 +62,14 @@ class Trainer(object):
         self.start_epoch = 0
 
         self.max_length = self.args.shared_rnn_max_length
-
+        self.args.trpo_clip = 0.1  
+        self.args.trpo_beta = 0.2  
         self.with_retrain = False
         self.submodel_manager = None
         self.controller = None
         self.build_model()  # build controller and sub-model
-
+        self.args.ppo_clip = 0.2  
+        self.args.ppo_epochs = 4  
         controller_optimizer = _get_optimizer(self.args.controller_optim)
         self.controller_optim = controller_optimizer(self.controller.parameters(), lr=self.args.controller_lr)
 
@@ -142,7 +149,12 @@ class Trainer(object):
             # 1. Training the shared parameters of the child graphnas
             self.train_shared(max_step=self.args.shared_initial_step)
             # 2. Training the controller parameters theta
-            self.train_controller()
+            if self.args.rlalgo == "trpo":
+                self.train_controller_trpo()
+            elif self.args.rlalgo == "ppo":
+                self.train_controller_ppo()
+            else:
+                self.train_controller()
             # 3. Derive architectures
             self.derive(sample_num=self.args.derive_num_sample)
 
@@ -215,11 +227,163 @@ class Trainer(object):
 
         return rewards, hidden
 
+    def train_controller_ppo(self): # PPO train controller
+        """
+        Train controller using Proximal Policy Optimization (PPO).
+        """
+        print("" * 35, "training controller with PPO", "" * 35)
+        model = self.controller
+        model.train()
+
+        optimizer = self.controller_optim
+        optimizer.zero_grad()
+
+        baseline = None
+        adv_history = []
+        entropy_history = []
+        reward_history = []
+
+        hidden = self.controller.init_hidden(self.args.batch_size)
+        total_loss = 0
+
+        for epoch in range(self.args.ppo_epochs):
+            for step in range(self.args.controller_max_step):
+                # sample graphnas
+                structure_list, log_probs, entropies = self.controller.sample(with_details=True)
+
+                # calculate reward
+                np_entropies = entropies.data.cpu().numpy()
+                results = self.get_reward(structure_list, np_entropies, hidden)
+                torch.cuda.empty_cache()
+
+                if results:  # reward exists
+                    rewards, hidden = results
+                else:
+                    continue  
+
+                # discount
+                if 1 > self.args.discount > 0:
+                    rewards = discount_butterworth(rewards, self.args.discount)
+
+                reward_history.extend(rewards)
+                entropy_history.extend(np_entropies)
+
+                # moving average baseline
+                if baseline is None:
+                    baseline = rewards
+                else:
+                    decay = self.args.ema_baseline_decay
+                    baseline = decay * baseline + (1 - decay) * rewards
+
+                adv = rewards - baseline
+                history.append(adv)
+                adv = scale(adv, scale_value=0.5)
+                adv_history.extend(adv)
+
+                adv = utils.get_variable(adv, self.cuda, requires_grad=False)
+                old_log_probs = log_probs.detach()
+
+                # calculate PPO loss
+                ratio = torch.exp(log_probs - old_log_probs)
+                surr1 = ratio * adv
+                surr2 = torch.clamp(ratio, 1.0 - self.args.ppo_clip, 1.0 + self.args.ppo_clip) * adv
+                policy_loss = -torch.min(surr1, surr2).mean()
+
+                # entropy regularization
+                entropy_loss = -self.args.entropy_coeff * entropies.mean()
+
+                loss = policy_loss + entropy_loss
+
+                # update
+                optimizer.zero_grad()
+                loss.backward()
+
+                if self.args.controller_grad_clip > 0:
+                    torch.nn.utils.clip_grad_norm(model.parameters(), self.args.controller_grad_clip)
+                optimizer.step()
+
+                total_loss += utils.to_item(loss.data)
+
+                self.controller_step += 1
+                torch.cuda.empty_cache()
+
+        print("" * 35, "training controller over", "" * 35)
+
+    def train_controller_trpo(self): #TRPO train controller
+        """
+        Train controller using Trust Region Policy Optimization (TRPO).
+        """
+        print("" * 35, "training controller with TRPO", "" * 35)
+        model = self.controller
+        model.train()
+
+        baseline = None
+        adv_history = []
+        entropy_history = []
+        reward_history = []
+
+        hidden = self.controller.init_hidden(self.args.batch_size)
+        total_loss = 0
+
+        for epoch in range(self.args.ppo_epochs):
+            for step in range(self.args.controller_max_step):
+                structure_list, log_probs, entropies = self.controller.sample(with_details=True)
+
+                np_entropies = entropies.data.cpu().numpy()
+                results = self.get_reward(structure_list, np_entropies, hidden)
+                torch.cuda.empty_cache()
+
+                if results:  
+                    rewards, hidden = results
+                else:
+                    continue  
+
+                if 1 > self.args.discount > 0:
+                    rewards = discount_butterworth(rewards, self.args.discount)
+
+                reward_history.extend(rewards)
+                entropy_history.extend(np_entropies)
+
+                if baseline is None:
+                    baseline = rewards
+                else:
+                    decay = self.args.ema_baseline_decay
+                    baseline = decay * baseline + (1 - decay) * rewards
+
+                adv = rewards - baseline
+                history.append(adv)
+                adv = scale(adv, scale_value=0.5)
+                adv_history.extend(adv)
+
+                adv = utils.get_variable(adv, self.cuda, requires_grad=False)
+                old_log_probs = log_probs.detach()
+
+                # calculate surrogate loss
+                ratio = torch.exp(log_probs - old_log_probs)
+                surr1 = ratio * adv
+                surr2 = torch.clamp(ratio, 1.0 - self.args.trpo_clip, 1.0 + self.args.trpo_clip) * adv
+                policy_loss = -torch.min(surr1, surr2).mean()
+
+                entropy_loss = -self.args.entropy_coeff * entropies.mean()
+
+                loss = policy_loss + entropy_loss
+
+                # TRPO update
+                optimizer = torch.optim.Adam(model.parameters(), lr=self.args.controller_lr)  # define optimizer here
+                self.trpo_update(model, old_log_probs, log_probs, adv)
+
+                total_loss += utils.to_item(loss.data)
+
+                self.controller_step += 1
+                torch.cuda.empty_cache()
+
+        print("" * 35, "training controller over", "" * 35)
+
     def train_controller(self):
         """
             Train controller to find better structure.
         """
-        print("*" * 35, "training controller", "*" * 35)
+        print("*" * 35, "training controller (baseline)", "*" * 35)
         model = self.controller
         model.train()
 
@@ -231,27 +395,26 @@ class Trainer(object):
         hidden = self.controller.init_hidden(self.args.batch_size)
         total_loss = 0
         for step in range(self.args.controller_max_step):
-            # sample graphnas
             structure_list, log_probs, entropies = self.controller.sample(with_details=True)
 
-            # calculate reward
+        
             np_entropies = entropies.data.cpu().numpy()
             results = self.get_reward(structure_list, np_entropies, hidden)
             torch.cuda.empty_cache()
 
-            if results:  # has reward
+            if results:  
                 rewards, hidden = results
             else:
-                continue  # CUDA Error happens, drop structure and step into next iteration
+                continue  
 
-            # discount
+        
             if 1 > self.args.discount > 0:
                 rewards = discount(rewards, self.args.discount)
 
             reward_history.extend(rewards)
             entropy_history.extend(np_entropies)
 
-            # moving average baseline
+            
             if baseline is None:
                 baseline = rewards
             else:
@@ -264,12 +427,12 @@ class Trainer(object):
             adv_history.extend(adv)
 
             adv = utils.get_variable(adv, self.cuda, requires_grad=False)
-            # policy loss
+      
             loss = -log_probs * adv
             if self.args.entropy_mode == 'regularizer':
                 loss -= self.args.entropy_coeff * entropies
 
-            loss = loss.sum()  # or loss.mean()
+            loss = loss.sum() 
 
             # update
             self.controller_optim.zero_grad()
@@ -287,6 +450,39 @@ class Trainer(object):
 
         print("*" * 35, "training controller over", "*" * 35)
 
+    
+    def trpo_update(self, model, old_log_probs, log_probs, adv):
+        """
+        Perform TRPO update on the model parameters.
+        """
+        loss = self.calculate_trpo_loss(model, old_log_probs, log_probs, adv)
+        model.zero_grad()
+        loss.backward(retain_graph = True)
+        self.trpo_step(model, loss)
+
+    def calculate_trpo_loss(self, model, old_log_probs, log_probs, adv):
+        """
+        Calculate TRPO surrogate loss.
+        """
+        ratio = torch.exp(log_probs - old_log_probs)
+        surr1 = ratio * adv
+        surr2 = torch.clamp(ratio, 1.0 - self.args.trpo_clip, 1.0 + self.args.trpo_clip) * adv
+        policy_loss = -torch.min(surr1, surr2).mean()
+    
+        kl_divergence = (old_log_probs - log_probs).mean()
+        
+        return policy_loss - self.args.trpo_beta * kl_divergence
+
+    def trpo_step(self, model, loss):
+        """
+        Perform TRPO optimization step.
+        """
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.args.controller_lr)
+    
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+                     
     def evaluate(self, gnn):
         """
         Evaluate a structure on the validation set.
@@ -302,7 +498,7 @@ class Trainer(object):
         logger.info(f'eval | {gnn} | reward: {reward:8.2f} | scores: {scores:8.2f}')
 
     def derive_from_history(self):
-        with open(self.args.dataset + "_" + self.args.search_mode + self.args.submanager_log_file, "a") as f:
+        with open(self.args.dataset + "_" + self.args.search_mode + self.args.submanager_log_file, "r") as f:
             lines = f.readlines()
 
         results = []
@@ -341,6 +537,7 @@ class Trainer(object):
             test_scores_list.append(test_acc)
         print(f"best results: {best_structure}: {np.mean(test_scores_list):.8f} +/- {np.std(test_scores_list)}")
         return best_structure
+    
 
     def derive(self, sample_num=None):
         """

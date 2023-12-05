@@ -78,7 +78,7 @@ class SimpleNASController(torch.nn.Module):
             else:
                 return False
         return True
-
+    
     def reset_parameters(self):
         init_range = 0.1
         for param in self.parameters():
@@ -126,6 +126,7 @@ class SimpleNASController(torch.nn.Module):
         actions = []
         for block_idx, action_name in enumerate(self.action_list):
             decoder_index = self.action_index(action_name)
+
 
             logits, hidden = self.forward(inputs,
                                           hidden,

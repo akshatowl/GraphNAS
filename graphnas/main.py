@@ -36,7 +36,7 @@ def register_default_args(parser):
     parser.add_argument('--load_path', type=str, default='')
     parser.add_argument('--search_mode', type=str, default='macro')
     parser.add_argument('--format', type=str, default='two')
-    parser.add_argument('--max_epoch', type=int, default=10)
+    parser.add_argument('--max_epoch', type=int, default=3)
 
     parser.add_argument('--ema_baseline_decay', type=float, default=0.95)
     parser.add_argument('--discount', type=float, default=1.0)
@@ -55,6 +55,8 @@ def register_default_args(parser):
     # child model
     parser.add_argument("--dataset", type=str, default="Citeseer", required=False,
                         help="The input dataset.")
+    parser.add_argument("--rlalgo", type=str, default="baseline", required=False,
+                        help="Reinforcement Learning Algorithm")
     parser.add_argument("--epochs", type=int, default=300,
                         help="number of training epochs")
     parser.add_argument("--retrain_epochs", type=int, default=300,
@@ -81,9 +83,7 @@ def main(args):  # pylint:disable=redefined-outer-name
 
     if args.cuda and not torch.cuda.is_available():  # cuda is not available
         args.cuda = False
-    # args.max_epoch = 1
-    # args.controller_max_step = 1
-    # args.derive_num_sample = 1
+ 
     torch.manual_seed(args.random_seed)
     if args.cuda:
         torch.cuda.manual_seed(args.random_seed)

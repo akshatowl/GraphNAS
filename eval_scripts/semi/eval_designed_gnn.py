@@ -32,14 +32,12 @@ def build_args():
                         help="input feature dropout")
     parser.add_argument("--lr", type=float, default=0.005,
                         help="learning rate")
-    # parser.add_argument("--lr", type=float, default=0.01,
-    #                     help="learning rate")
+ 
     parser.add_argument("--param_file", type=str, default="cora_test.pkl",
                         help="learning rate")
     parser.add_argument("--optim_file", type=str, default="opt_cora_test.pkl",
                         help="optimizer save path")
     parser.add_argument('--weight_decay', type=float, default=5e-4)
-    # parser.add_argument('--weight_decay', type=float, default=0.001)
     parser.add_argument('--max_param', type=float, default=5E6)
     args = parser.parse_args()
 
@@ -48,17 +46,16 @@ def build_args():
 
 if __name__ == "__main__":
     args = build_args()
-
+    custom_architecture_path = "/home/akshat/GraphNAS/Citeseer/controller_epoch2_step1200_optimizer.pth" # enter the model path
+    custom_gnn_architecture = torch.load(custom_architecture_path)
     gnn_list = [
         ['gat', 'sum', 'linear', 4, 128, 'linear', 'sum', 'elu', 8, 6],
-        ['gcn', 'sum', 'tanh', 6, 64, 'cos', 'sum', 'tanh', 6, 3],
+        custom_gnn_architecture,
         ['const', 'sum', 'relu6', 2, 128, 'gat', 'sum', 'linear', 2, 7],
     ]
-    dataset_list = ["Citeseer", "Pubmed", "cora"]
-    base_list = ["pyg", "pyg", "dgl", ]
+    dataset_list = ["Citeseer"]
+    base_list = ["pyg"]
     for dataset, actions, base in zip(dataset_list, gnn_list, base_list):
-        # if dataset == "cora":
-        #     continue
         args.dataset = dataset
         if base == "dgl":
             manager = CitationGNNManager(args)
