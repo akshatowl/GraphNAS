@@ -82,7 +82,5 @@ The results are generated for a Citeseer academic paper dataset.
  
     
 
-#### Acknowledgements
-This repo is modified based on [DGL](https://github.com/dmlc/dgl) and [PYG](https://github.com/rusty1s/pytorch_geometric).
 
 
