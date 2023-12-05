@@ -1,4 +1,4 @@
-# IMPROVISED GRAPH NEURAL ARCHITECTURE SEARCH THROUGH POLICY OPTIMIZATION METHODS
+# Improvised Graph Neural Architecture Search Through Policy Optimization Methods
 # Try it yourself!
 ## Setting up the codebase
 Clone this repository on the local machine
