@@ -69,7 +69,7 @@ Run the command:
 python -m eval_scripts.semi.eval_designed_gnn
 
 ```
-## Experimentaion test accuracy results
+## Experimentation test accuracy results
 PPO and TRPO algorithms have discount generation using a 4 order butterworth filter with a cutoff frequency of 0.1 Hz. 
 The results are generated for a Citeseer academic paper dataset. 
 | Techniques | Test Accuracy |
