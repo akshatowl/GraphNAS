@@ -1,4 +1,4 @@
-# GraphNAS
+# IMPROVISED GRAPH NEURAL ARCHITECTURE SEARCH THROUGH POLICY OPTIMIZATION METHODS
 # Try it yourself!
 ## Setting up the codebase
 Clone this repository on the local machine
