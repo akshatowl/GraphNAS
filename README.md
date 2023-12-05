@@ -69,34 +69,15 @@ Run the command:
 python -m eval_scripts.semi.eval_designed_gnn
 
 ```
+## Experimentaion test accuracy results
+PPO and TRPO algorithms have discount generation using a 4 order butterworth filter with a cutoff frequency of 0.1 Hz.  
+Citeseer Dataset
 
-
-Model| Cora | Citeseer | Pubmed
-|-|-|-|-|
-GCN	| 81.5+/-0.4 | 70.9+/-0.5   | 79.0+/-0.4  
-SGC	|  81.0+/-0.0 |   71.9+/-0.1   |  78.9+/-0.0   
-GAT	|  83.0+/-0.7  |  72.5+/-0.7   | 79.0+/-0.3    
-LGCN	|  83.3+/-0.5  | 73.0+/-0.6	|  79.5+/-0.2   
-DGCN	|  82.0+/-0.2  | 72.2+/-0.3	|  78.6+/-0.1   
-ARMA	|  82.8+/-0.6  | 72.3+/-1.1	|  78.8+/-0.3   
-APPNP   |  83.3+/-0.6  | 71.8+/-0.4	|  80.2+/-0.2   
-simple-NAS |  81.4+/-0.6  |  71.7+/-0.6	|  79.5+/-0.5  
-GraphNAS | **84.3+/-0.4**  | **73.7+/-0.2**	| **80.6+/-0.2**  
-   	 
-Supervised node classification w.r.t. accuracy    
-
-Model| Cora | Citeseer | Pubmed  
-|-|-|-|-|
-GCN	| 90.2+/-0.0  | 80.0+/-0.3   | 87.8+/-0.2  
-SGC	| 88.8+/-0.0 |  80.6+/-0.0   |   86.5+/-0.1  
-GAT	|  89.5+/-0.3  |  78.6+/-0.3	|  86.5+/-0.6   
-LGCN	| 88.7+/-0.5  | 79.2+/-0.4 	|  OOM    
-DGCN	|  88.4+/-0.2  |  78.0+/-0.2	|  88.0+/-0.9    
-ARMA	|  89.8+/-0.1  |  79.9+/-0.6	|  88.1+/-0.2    
-APPNP	| 90.4+/-0.2  | 79.2+/-0.4 	| 87.4+/-0.3    
-random-NAS | 90.0+/-0.3   |  81.1+/-0.3	| 90.7+/-0.6    
-simple-NAS | 90.1+/-0.3  |  79.6+/-0.5	|  88.5+/-0.2  
-GraphNAS | **90.6+/-0.3**   |  **81.3+/-0.4**   | **91.3+/-0.3**    
+GraphNAS(Baseline) | **73.7+/-0.2**  |
+  APPNP   |  71.8+/-0.4	  |   
+simple-NAS |  71.7+/-0.6  |
+GNAS with PPO |  73.64+/-0.21  |
+GNAS with TRPO |  73.64+/-0.21  |
     
 
 #### Acknowledgements
