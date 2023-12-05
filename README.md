@@ -72,12 +72,13 @@ python -m eval_scripts.semi.eval_designed_gnn
 ## Experimentaion test accuracy results
 PPO and TRPO algorithms have discount generation using a 4 order butterworth filter with a cutoff frequency of 0.1 Hz.  
 | Citeseer Dataset | Test Accuracy |
-
-GraphNAS(Baseline) | **73.7+/-0.2**  |  
-  APPNP   |  71.8+/-0.4	  |     
-simple-NAS |  71.7+/-0.6  |  
-GNAS with PPO |  73.64+/-0.21  |  
-GNAS with TRPO |  73.64+/-0.21  |  
+|-------------------|---------------|
+| GraphNAS(Baseline)| 73.7+/-0.2    |
+| APPNP             | 71.8+/-0.4    |
+| simple-NAS        | 71.7+/-0.6    |
+| GNAS with PPO     | 73.64+/-0.21  |
+| GNAS with TRPO    | 73.64+/-0.21  |
+ 
     
 
 #### Acknowledgements
