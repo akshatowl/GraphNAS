@@ -70,6 +70,8 @@ class Trainer(object):
         self.build_model()  # build controller and sub-model
         self.args.ppo_clip = 0.2  
         self.args.ppo_epochs = 4  
+        self.args.trpo_epochs = 4  
+
         controller_optimizer = _get_optimizer(self.args.controller_optim)
         self.controller_optim = controller_optimizer(self.controller.parameters(), lr=self.args.controller_lr)
 
@@ -325,7 +327,7 @@ class Trainer(object):
         hidden = self.controller.init_hidden(self.args.batch_size)
         total_loss = 0
 
-        for epoch in range(self.args.ppo_epochs):
+        for epoch in range(self.args.trpo_epochs):
             for step in range(self.args.controller_max_step):
                 structure_list, log_probs, entropies = self.controller.sample(with_details=True)
 
