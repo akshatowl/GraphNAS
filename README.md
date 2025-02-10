@@ -82,4 +82,3 @@ The results are generated for a Citeseer academic paper dataset.
  
     
 
-
